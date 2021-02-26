@@ -1,19 +1,15 @@
-from jinja2 import Template
-import os
+"""
+Работа с шаблонами, паттерн INTERFACE
+Используем шаблонизатор jinja2
+"""
+from jinja2.environment import Environment
+from jinja2 import FileSystemLoader
 
 
 def render(template_name, folder='templates', **kwargs):
-    """
-    :param template_name: имя шаблона
-    :param folder: папка в которой ищем шаблон
-    :param kwargs: параметры
-    :return:
-    """
-    file_path = os.path.join(folder, template_name)
-    # открываем шаблон
-    with open(file_path, encoding='utf-8') as f:
-        # читаем
-        template = Template(f.read())
-    # рендерим шаблон с параметрами
-    return template.render(**kwargs)
+    env = Environment()
+    env.loader = FileSystemLoader(folder)
+    tmpl = env.get_template(template_name)
+    return tmpl.render(**kwargs)
+
 
