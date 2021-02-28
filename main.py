@@ -1,6 +1,8 @@
-from wavy import render, Application
+from wsgiref.simple_server import make_server
+
+from wavy import render, Application, DebugApplication, FakeApplication
 from models import TrainingSite
-from logging_mod import Logger
+from logging_mod import Logger, debug
 
 # Создание копирование курса, список курсов
 # Регистрация пользователя, список пользователей
@@ -16,11 +18,13 @@ def main_view(request):
     return '200 OK', render('course_list.html', objects_list=site.courses)
 
 
+@debug
 def create_course(request):
     if request['method'] == 'POST':
         # метод пост
         data = request['data']
         name = data['name']
+        name = Application.decode_value(name)
         category_id = data.get('category_id')
         # print(category_id)
         category = None
@@ -37,7 +41,7 @@ def create_course(request):
         categories = site.categories
         return '200 OK', render('create_course.html', categories=categories)
 
-
+@debug
 def create_category(request):
     if request['method'] == 'POST':
         # метод пост
@@ -64,6 +68,28 @@ def create_category(request):
         return '200 OK', render('create_category.html', categories=categories)
 
 
+urlpatterns = {
+    '/': main_view,
+    '/create-course/': create_course,
+    '/create-category/': create_category,
+}
+
+
+def secret_controller(request):
+    request['secret'] = 'secret'
+
+
+front_controllers = [
+    secret_controller
+]
+
+application = Application(urlpatterns, front_controllers)
+
+# application = DebugApplication(urlpatterns, front_controllers)
+# application = FakeApplication(urlpatterns, front_controllers)
+
+
+@application.add_route('/copy-course/')
 def copy_course(request):
     request_params = request['request_params']
     # print(request_params)
@@ -78,28 +104,12 @@ def copy_course(request):
     return '200 OK', render('course_list.html', objects_list=site.courses)
 
 
+@application.add_route('/category-list/')
 def category_list(request):
     logger.log('Список категорий')
     return '200 OK', render('category_list.html', objects_list=site.categories)
 
 
-urlpatterns = {
-    '/': main_view,
-    '/create-course/': create_course,
-    '/create-category/': create_category,
-    '/copy-course/': copy_course,
-    '/category-list/': category_list,
-
-}
-
-
-def secret_controller(request):
-    request['secret'] = 'secret'
-
-
-front_controllers = [
-    secret_controller
-]
-
-application = Application(urlpatterns, front_controllers)
-
+with make_server('', 8000, application) as httpd:
+    print("Serving on port 8000...")
+    httpd.serve_forever()

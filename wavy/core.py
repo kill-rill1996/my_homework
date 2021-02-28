@@ -1,4 +1,5 @@
 import quopri
+from wsgiref.util import setup_testing_defaults
 
 
 class Application:
@@ -7,6 +8,13 @@ class Application:
         val_b = bytes(val.replace('%', '=').replace("+", " "), 'UTF-8')
         val_decode_str = quopri.decodestring(val_b)
         return val_decode_str.decode('UTF-8')
+
+    def add_route(self, url):
+        # паттерн декоратор
+        def inner(view):
+            self.urlpatterns[url] = view
+
+        return inner
 
     def parse_input_data(self, data: str):
         result = {}
@@ -40,6 +48,8 @@ class Application:
         self.front_controllers = front_controllers
 
     def __call__(self, env, start_response):
+        setup_testing_defaults(env)
+
         # текущий url
         path = env['PATH_INFO']
 
@@ -76,3 +86,33 @@ class Application:
             # Если url нет в urlpatterns - то страница не найдена
             start_response('404 NOT FOUND', [('Content-Type', 'text/html')])
             return [b"Not Found"]
+
+
+# Новый вид WSGI-application.
+# Первый — логирующий (такой же, как основной,
+# только для каждого запроса выводит информацию
+# (тип запроса и параметры) в консоль.
+class DebugApplication(Application):
+
+    def __init__(self, urlpatterns, front_controllers):
+        self.application = Application(urlpatterns, front_controllers)
+        super().__init__(urlpatterns, front_controllers)
+
+    def __call__(self, env, start_response):
+        print('DEBUG MODE')
+        print(env)
+        return self.application(env, start_response)
+
+
+# Новый вид WSGI-application.
+# Второй — фейковый (на все запросы пользователя отвечает:
+# 200 OK, Hello from Fake).
+class FakeApplication(Application):
+
+    def __init__(self, urlpatterns, front_controllers):
+        self.application = Application(urlpatterns, front_controllers)
+        super().__init__(urlpatterns, front_controllers)
+
+    def __call__(self, env, start_response):
+        start_response('200 OK', [('Content-Type', 'text/html')])
+        return [b'Hello from Fake']
