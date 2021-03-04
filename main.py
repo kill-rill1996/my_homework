@@ -1,8 +1,9 @@
 from wsgiref.simple_server import make_server
-
 from wavy import render, Application, DebugApplication, FakeApplication
-from models import TrainingSite
+from models import TrainingSite, EmailNotifier, SmsNotifier
 from logging_mod import Logger, debug
+from wavy.wavycbv import ListView, CreateView
+
 
 # Создание копирование курса, список курсов
 # Регистрация пользователя, список пользователей
@@ -10,11 +11,12 @@ from logging_mod import Logger, debug
 
 site = TrainingSite()
 logger = Logger('main')
+sms_notifier = SmsNotifier()
+email_notifier = EmailNotifier()
 
 
 def main_view(request):
     logger.log('Список курсов')
-    print(f'Список курсов - {site.courses}')
     return '200 OK', render('course_list.html', objects_list=site.courses)
 
 
@@ -26,12 +28,14 @@ def create_course(request):
         name = data['name']
         name = Application.decode_value(name)
         category_id = data.get('category_id')
-        # print(category_id)
-        category = None
+        print(category_id)
         if category_id:
             category = site.find_category_by_id(int(category_id))
 
             course = site.create_course('record', name, category)
+            # Добавляем наблюдателей на курс
+            course.observers.append(sms_notifier)
+            course.observers.append(email_notifier)
             site.courses.append(course)
         # редирект?
         # return '302 Moved Temporarily', render('create_course.html')
@@ -41,7 +45,7 @@ def create_course(request):
         categories = site.categories
         return '200 OK', render('create_course.html', categories=categories)
 
-@debug
+
 def create_category(request):
     if request['method'] == 'POST':
         # метод пост

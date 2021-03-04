@@ -1,9 +1,12 @@
 from reuserpatterns.prototype import PrototypeMixin
+from reuserpatterns.observer import Observer, Subject
+import jsonpickle
 
 
 # абстрактный польователь
 class User:
-    pass
+    def __init__(self, name):
+        self.name = name
 
 
 # преподаватель
@@ -13,7 +16,10 @@ class Teacher(User):
 
 # студент
 class Student(User):
-    pass
+
+    def __init__(self, name):
+        self.courses = []
+        super().__init__(name)
 
 
 # Фабрика пользователей
@@ -47,12 +53,46 @@ class Category:
 
 
 # Курс
-class Course(PrototypeMixin):
+class Course(PrototypeMixin, Subject):
 
     def __init__(self, name, category):
         self.name = name
         self.category = category
         self.category.courses.append(self)
+        self.students = []
+        super().__init__()
+
+    def __getitem__(self, item):
+        return self.students[item]
+
+    def add_student(self, student: Student):
+        self.students.append(student)
+        student.courses.append(self)
+        self.notify()
+
+
+class SmsNotifier(Observer):
+
+    def update(self, subject: Course):
+        print(f'SMS--> К нам присоеденился студент {subject.students[-1].name}')
+
+
+class EmailNotifier(Observer):
+
+    def update(self, subject: Course):
+        print(f'Email--> К нам присоеденился студент {subject.students[-1].name}')
+
+
+class BaseSerializer:
+
+    def __init__(self, obj):
+        self.obj = obj
+
+    def save(self):
+        return jsonpickle.dumps(self.obj)
+
+    def load(self, data):
+        return jsonpickle.loads(data)
 
 
 # Интерактивный курс
