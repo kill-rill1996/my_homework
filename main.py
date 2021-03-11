@@ -3,6 +3,8 @@ from wavy import render, Application, DebugApplication, FakeApplication
 from models import TrainingSite, BaseSerializer, EmailNotifier, SmsNotifier
 from logging_mod import Logger, debug
 from wavy.wavycbv import ListView, CreateView
+from wavyorm import UnitOfWork
+from mappers import MapperRegistry
 
 # Создание копирование курса, список курсов
 # Регистрация пользователя, список пользователей
@@ -12,6 +14,8 @@ site = TrainingSite()
 logger = Logger('main')
 email_notifier = EmailNotifier()
 sms_notifier = SmsNotifier()
+UnitOfWork.new_current()
+UnitOfWork.get_current().set_mapper_registry(MapperRegistry)
 
 
 def main_view(request):
@@ -66,14 +70,19 @@ class CategoryCreateView(CreateView):
         new_category = site.create_category(name, category)
         site.categories.append(new_category)
 
+
 class CategoryListView(ListView):
     queryset = site.categories
     template_name = 'category_list.html'
 
 
 class StudentListView(ListView):
-    queryset = site.students
+    # queryset = site.students
     template_name = 'student_list.html'
+
+    def get_queryset(self):
+        mapper = MapperRegistry.get_current_mapper('student')
+        return mapper.all()
 
 
 class StudentCreateView(CreateView):
@@ -84,6 +93,8 @@ class StudentCreateView(CreateView):
         name = Application.decode_value(name)
         new_obj = site.create_user('student', name)
         site.students.append(new_obj)
+        new_obj.mark_new()
+        UnitOfWork.get_current().commit()
 
 
 class AddStudentByCourseCreateView(CreateView):
@@ -129,7 +140,7 @@ application = Application(urlpatterns, front_controllers)
 
 # proxy
 # application = DebugApplication(urlpatterns, front_controllers)
-# application = FakeApplication(urlpatterns, front_controllers)
+# application = MockApplication(urlpatterns, front_controllers)
 
 
 @application.add_route('/copy-course/')
@@ -137,6 +148,7 @@ def copy_course(request):
     request_params = request['request_params']
     # print(request_params)
     name = request_params['name']
+    name = Application.decode_value(name)
     old_course = site.get_course(name)
     if old_course:
         new_name = f'copy_{name}'
@@ -147,11 +159,9 @@ def copy_course(request):
     return '200 OK', render('course_list.html', objects_list=site.courses)
 
 
-@application.add_route('/category-list/')
-def category_list(request):
-    logger.log('Список категорий')
-    return '200 OK', render('category_list.html', objects_list=site.categories)
-
+@application.add_route('/api/')
+def course_api(request):
+    return '200 OK', BaseSerializer(site.courses).save()
 
 with make_server('', 8000, application) as httpd:
     print("Serving on port 8000...")
