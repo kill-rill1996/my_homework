@@ -1,5 +1,4 @@
 import quopri
-from wsgiref.util import setup_testing_defaults
 
 
 class Application:
@@ -39,25 +38,18 @@ class Application:
         data = env['wsgi.input'].read(content_length) if content_length > 0 else b''
         return data
 
-    def __init__(self, urlpatterns: dict, front_controllers: list):
-        """
-        :param urlpatterns: словарь связок url: view
-        :param front_controllers: список front controllers
-        """
+    def __init__(self, urlpatterns, front_controllers):
         self.urlpatterns = urlpatterns
         self.front_controllers = front_controllers
 
     def __call__(self, env, start_response):
-        setup_testing_defaults(env)
 
-        # текущий url
         path = env['PATH_INFO']
 
-        # добавление / в url, если он отсутствует
-        if path[-1] != '/':
-            path += '/'
+        # добавление закрывающего слеша
+        if not path.endswith('/'):
+            path = f'{path}/'
 
-        # Получаем данные запроса
         method = env['REQUEST_METHOD']
         data = self.get_wsgi_input_data(env)
         data = self.parse_wsgi_input_data(data)
@@ -66,24 +58,20 @@ class Application:
         request_params = self.parse_input_data(query_string)
 
         if path in self.urlpatterns:
-            # получаем view по url
+            # паттерн page controller
             view = self.urlpatterns[path]
             request = {}
-            # добавляем в запрос параметры
+            # добавляем метод которым пришел запрос
             request['method'] = method
             request['data'] = data
             request['request_params'] = request_params
-            # добавляем в request данные из front_controllers
             for controller in self.front_controllers:
+                # паттерн front controller
                 controller(request)
-            # вызываем view, получаем результат
             code, text = view(request)
-            # возвращаем заголовки
             start_response(code, [('Content-Type', 'text/html')])
-            # возвращаем тело ответа
             return [text.encode('utf-8')]
         else:
-            # Если url нет в urlpatterns - то страница не найдена
             start_response('404 NOT FOUND', [('Content-Type', 'text/html')])
             return [b"Not Found"]
 

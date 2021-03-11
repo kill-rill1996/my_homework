@@ -7,11 +7,11 @@ class TemplateView:
     def get_context_data(self):
         return {}
 
-    def get_template_name(self):
+    def get_template(self):
         return self.template_name
 
     def render_template_with_context(self):
-        template_name = self.get_template_name()
+        template_name = self.get_template()
         context = self.get_context_data()
         return '200 OK', render(template_name, **context)
 
@@ -32,8 +32,8 @@ class ListView(TemplateView):
         return self.context_object_name
 
     def get_context_data(self):
-        queryset = self.queryset
-        context_object_name = self.context_object_name
+        queryset = self.get_queryset()
+        context_object_name = self.get_context_object_name()
         context = {context_object_name: queryset}
         return context
 
@@ -41,7 +41,7 @@ class ListView(TemplateView):
 class CreateView(TemplateView):
     template_name = 'create.html'
 
-    def get_request_data(self, request: dict)-> dict:
+    def get_request_data(self, request: dict) -> dict:
         return request['data']
 
     def create_obj(self, data: dict):
@@ -49,8 +49,12 @@ class CreateView(TemplateView):
 
     def __call__(self, request: dict):
         if request['method'] == 'POST':
-            data = self.get_context_data(request)
+            # метод пост
+            data = self.get_request_data(request)
             self.create_obj(data)
+            # редирект?
+            # return '302 Moved Temporarily', render('create_course.html')
+            # Для начала можно без него
             return self.render_template_with_context()
         else:
             return super().__call__(request)

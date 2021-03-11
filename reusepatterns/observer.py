@@ -12,3 +12,4 @@ class Subject:
     def notify(self):
         for item in self.observers:
             item.update(self)
+

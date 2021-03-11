@@ -1,9 +1,9 @@
-from reuserpatterns.prototype import PrototypeMixin
-from reuserpatterns.observer import Observer, Subject
+from reusepatterns.prototypes import PrototypeMixin
+from reusepatterns.observer import Subject, Observer
 import jsonpickle
 
 
-# абстрактный польователь
+# абстрактный пользователь
 class User:
     def __init__(self, name):
         self.name = name
@@ -14,7 +14,6 @@ class Teacher(User):
     pass
 
 
-# студент
 class Student(User):
 
     def __init__(self, name):
@@ -30,12 +29,13 @@ class UserFactory:
     }
 
     @classmethod
-    def create(cls, type_):
-        return cls.types[type_]()
+    def create(cls, type_, name):
+        return cls.types[type_](name)
 
 
 # Категория
 class Category:
+    # реестр?
     auto_id = 0
 
     def __init__(self, name, category):
@@ -74,13 +74,13 @@ class Course(PrototypeMixin, Subject):
 class SmsNotifier(Observer):
 
     def update(self, subject: Course):
-        print(f'SMS--> К нам присоеденился студент {subject.students[-1].name}')
+        print('SMS->', 'к нам присоединился', subject.students[-1].name)
 
 
 class EmailNotifier(Observer):
 
     def update(self, subject: Course):
-        print(f'Email--> К нам присоеденился студент {subject.students[-1].name}')
+        print(('EMAIL->', 'к нам присоединился', subject.students[-1].name))
 
 
 class BaseSerializer:
@@ -119,15 +119,16 @@ class CourseFactory:
 
 # Основной класс - интерфейс проекта
 class TrainingSite:
+    # Интерфейс
     def __init__(self):
         self.teachers = []
-        self.student = []
+        self.students = []
         self.courses = []
         self.categories = []
 
     @staticmethod
-    def create_user(type_):
-        return UserFactory(type_)
+    def create_user(type_, name):
+        return UserFactory.create(type_, name)
 
     @staticmethod
     def create_category(name, category=None):
@@ -148,13 +149,8 @@ class TrainingSite:
         for item in self.courses:
             if item.name == name:
                 return item
-        return None
 
-
-
-
-
-
-
-
-
+    def get_student(self, name) -> Student:
+        for item in self.students:
+            if item.name == name:
+                return item

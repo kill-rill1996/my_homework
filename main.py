@@ -1,9 +1,8 @@
 from wsgiref.simple_server import make_server
 from wavy import render, Application, DebugApplication, FakeApplication
-from models import TrainingSite, EmailNotifier, SmsNotifier
+from models import TrainingSite, BaseSerializer, EmailNotifier, SmsNotifier
 from logging_mod import Logger, debug
 from wavy.wavycbv import ListView, CreateView
-
 
 # Создание копирование курса, список курсов
 # Регистрация пользователя, список пользователей
@@ -11,8 +10,8 @@ from wavy.wavycbv import ListView, CreateView
 
 site = TrainingSite()
 logger = Logger('main')
-sms_notifier = SmsNotifier()
 email_notifier = EmailNotifier()
+sms_notifier = SmsNotifier()
 
 
 def main_view(request):
@@ -34,25 +33,29 @@ def create_course(request):
 
             course = site.create_course('record', name, category)
             # Добавляем наблюдателей на курс
-            course.observers.append(sms_notifier)
             course.observers.append(email_notifier)
+            course.observers.append(sms_notifier)
             site.courses.append(course)
         # редирект?
         # return '302 Moved Temporarily', render('create_course.html')
         # Для начала можно без него
-        return '200 OK', render('create_course.html')
+        categories = site.categories
+        return '200 OK', render('create_course.html', categories=categories)
     else:
         categories = site.categories
         return '200 OK', render('create_course.html', categories=categories)
 
 
-def create_category(request):
-    if request['method'] == 'POST':
-        # метод пост
-        data = request['data']
-        # print(data)
-        name = data['name']
+class CategoryCreateView(CreateView):
+    template_name = 'create_category.html'
 
+    def get_context_data(self):
+        context = super().get_context_data()
+        context['categories'] = site.categories
+        return context
+
+    def create_obj(self, data: dict):
+        name = data['name']
         name = Application.decode_value(name)
         category_id = data.get('category_id')
 
@@ -61,21 +64,55 @@ def create_category(request):
             category = site.find_category_by_id(int(category_id))
 
         new_category = site.create_category(name, category)
-
         site.categories.append(new_category)
-        # редирект?
-        # return '302 Moved Temporarily', render('create_course.html')
-        # Для начала можно без него
-        return '200 OK', render('create_category.html')
-    else:
-        categories = site.categories
-        return '200 OK', render('create_category.html', categories=categories)
+
+class CategoryListView(ListView):
+    queryset = site.categories
+    template_name = 'category_list.html'
+
+
+class StudentListView(ListView):
+    queryset = site.students
+    template_name = 'student_list.html'
+
+
+class StudentCreateView(CreateView):
+    template_name = 'create_student.html'
+
+    def create_obj(self, data: dict):
+        name = data['name']
+        name = Application.decode_value(name)
+        new_obj = site.create_user('student', name)
+        site.students.append(new_obj)
+
+
+class AddStudentByCourseCreateView(CreateView):
+    template_name = 'add_student.html'
+
+    def get_context_data(self):
+        context = super().get_context_data()
+        context['courses'] = site.courses
+        context['students'] = site.students
+        return context
+
+    def create_obj(self, data: dict):
+        course_name = data['course_name']
+        course_name = Application.decode_value(course_name)
+        course = site.get_course(course_name)
+        student_name = data['student_name']
+        student_name = Application.decode_value(student_name)
+        student = site.get_student(student_name)
+        course.add_student(student)
 
 
 urlpatterns = {
     '/': main_view,
     '/create-course/': create_course,
-    '/create-category/': create_category,
+    '/create-category/': CategoryCreateView(),
+    '/category-list/': CategoryListView(),
+    '/student-list/': StudentListView(),
+    '/create-student/': StudentCreateView(),
+    '/add-student/': AddStudentByCourseCreateView(),
 }
 
 
@@ -89,6 +126,8 @@ front_controllers = [
 
 application = Application(urlpatterns, front_controllers)
 
+
+# proxy
 # application = DebugApplication(urlpatterns, front_controllers)
 # application = FakeApplication(urlpatterns, front_controllers)
 
